@@ -18,7 +18,7 @@ static JavaVM *jvm = NULL;
 static jclass m_clazz = NULL;//当前类(面向java)
 
 JNIEXPORT void JNICALL
-Java_com_cy_androidcmd_JniUtils_runCmd(JNIEnv *env, jclass clazz, jobjectArray commands) {
+Java_com_cy_ffmpegcmd_JniUtils_runCmd(JNIEnv *env, jclass clazz, jobjectArray commands) {
     jniEnv = env;
     clazz_java = clazz;
     int argc = (*env)->GetArrayLength(env, commands);
@@ -43,8 +43,14 @@ Java_com_cy_androidcmd_JniUtils_runCmd(JNIEnv *env, jclass clazz, jobjectArray c
 //    free(strr);
 
     int ret = run_cmd(argc, argv);
-    jmethodID methodId = getMethodID(jniEnv, clazz_java, "onFinish", "(I)V");
-    if (methodId != NULL)(*jniEnv)->CallVoidMethod(jniEnv,clazz_java, methodId, ret);
+    if(ret==0){
+        jmethodID methodId = getMethodID(jniEnv, clazz_java, "onSuccess", "()V");
+        if (methodId != NULL)(*jniEnv)->CallVoidMethod(jniEnv,clazz_java, methodId, ret);
+    } else{
+        jmethodID methodId = getMethodID(jniEnv, clazz_java, "onFail", "()V");
+        if (methodId != NULL)(*jniEnv)->CallVoidMethod(jniEnv,clazz_java, methodId, ret);
+    }
+
 
 }
 
@@ -52,10 +58,10 @@ void cmd_progress(int hour,int min,int secs,int totalSecs) {
     jmethodID methodId = getMethodID(jniEnv, clazz_java, "onProgress", "(IIII)V");
     if (methodId != NULL)(*jniEnv)->CallVoidMethod(jniEnv, clazz_java, methodId, hour,min,secs,totalSecs);
 }
-void cmd_onFailed(char * msg){
-    jmethodID methodId = getMethodID(jniEnv, clazz_java, "onFailed", "(Ljava/lang/String;)V");
-    if (methodId != NULL)(*jniEnv)->CallVoidMethod(jniEnv, clazz_java, methodId, (*jniEnv)->NewStringUTF(jniEnv,msg));
-}
+//void cmd_onFailed(char * msg){
+//    jmethodID methodId = getMethodID(jniEnv, clazz_java, "onFailed", "(Ljava/lang/String;)V");
+//    if (methodId != NULL)(*jniEnv)->CallVoidMethod(jniEnv, clazz_java, methodId, (*jniEnv)->NewStringUTF(jniEnv,msg));
+//}
 ///**
 // * c语言-线程回调
 // */
