@@ -1,4 +1,4 @@
-package com.cy.androidcmd;
+package com.cy.ffmpegcmd;
 
 import android.os.Environment;
 import android.os.Bundle;

@@ -1,4 +1,4 @@
-package com.cy.androidcmd;
+package com.cy.ffmpegcmd;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;

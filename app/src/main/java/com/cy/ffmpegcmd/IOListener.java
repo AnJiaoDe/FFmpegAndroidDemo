@@ -1,4 +1,4 @@
-package com.cy.androidcmd;
+package com.cy.ffmpegcmd;
 public interface IOListener<T> {
     public void onCompleted(T result);
     public void onLoding(T readedPart, long current, long length);

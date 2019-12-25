@@ -1,10 +1,8 @@
-package com.cy.androidcmd;
+package com.cy.ffmpegcmd;
 
 
 import java.io.*;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.List;
 
 public class FileUtils {
     public static String subNameNoSuffix(String fileName) {

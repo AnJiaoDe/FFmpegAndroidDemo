@@ -1,4 +1,4 @@
-package com.cy.androidcmd;
+package com.cy.ffmpegcmd;
 
 import android.os.Bundle;
 import android.support.annotation.Nullable;
