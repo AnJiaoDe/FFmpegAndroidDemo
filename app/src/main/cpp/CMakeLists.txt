@@ -21,8 +21,8 @@ add_library( # Sets the name of the library.
 
         # Sets the library as a shared library.
         SHARED
-        include/cmd.c
         #        include/jni_utils.cpp
+        ffmpeg_cmd.cpp
         native-lib.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a

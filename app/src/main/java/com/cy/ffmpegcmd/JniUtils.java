@@ -20,28 +20,66 @@ public class JniUtils {
         return JniUtilsFactory.instance;
     }
 
-    public void cmdAsync(final String[] commands, CmdCallback cmdCallback) {
+    public int cmdAsync(final String[] commands, CmdCallback cmdCallback) {
         final int index = map_cmdCallback.size() > 0 ? map_cmdCallback.size() - 1 : 0;
         map_cmdCallback.put(index, cmdCallback);
-        runCmd(index, commands);
+        cmdCallback.setId_thread(runCmd(index, commands));
+        return index;
     }
 
-    private static native void runCmd(int index, String[] commands);
+    public void cancel(int index) {
+        CmdCallback cmdCallback = map_cmdCallback.get(index);
+        if (cmdCallback != null) {
+            cancelCmd(cmdCallback.getId_thread());
+            cmdCallback.onCancel();
+            map_cmdCallback.remove(index);
+        }
+    }
+    public void cancelAll() {
+        for(Integer index:map_cmdCallback.keySet()){
+            CmdCallback cmdCallback = map_cmdCallback.get(index);
+            if (cmdCallback != null) {
+                cancelCmd(cmdCallback.getId_thread());
+                cmdCallback.onCancel();
+            }
+        }
+        map_cmdCallback.clear();
+    }
 
-    private static native void cancelCmd(int index);
+    private static native long runCmd(int index, String[] commands);
+
+    private static native void cancelCmd(long id_thread);
 
     private void onProgress(int index, int hour, int min, int secs, int totalSecs) {
-
+        CmdCallback cmdCallback = map_cmdCallback.get(index);
+        if (cmdCallback != null) cmdCallback.onProgress(hour, min, secs, totalSecs);
         LogUtils.log("onProgress", hour + ":" + min + ":" + secs + "__________" + totalSecs);
     }
 
     private void onFail(int index) {
         LogUtils.log("onFail");
-        map_cmdCallback.remove(index);
+        CmdCallback cmdCallback = map_cmdCallback.get(index);
+        if (cmdCallback != null) {
+            cmdCallback.onFail();
+            map_cmdCallback.remove(index);
+        }
+    }
+
+    private void onCancel(int index) {
+        LogUtils.log("onFail");
+        CmdCallback cmdCallback = map_cmdCallback.get(index);
+        if (cmdCallback != null) {
+            cmdCallback.onCancel();
+            map_cmdCallback.remove(index);
+        }
     }
 
     private void onSuccess(int index) {
         LogUtils.log("onSuccess");
-        map_cmdCallback.remove(index);
+        CmdCallback cmdCallback = map_cmdCallback.get(index);
+        if (cmdCallback != null) {
+            cmdCallback.onSuccess();
+            map_cmdCallback.remove(index);
+        }
     }
 }
