@@ -12,19 +12,18 @@
 #include "ffmpeg_cmd.h"
 #include <pthread.h>
 
-JNIEnv *jniEnv;
-JavaVM *jvm;
-
-jclass clazz_java;
+static JavaVM *jvm;
+static jclass clazz_java;
 
 struct Parameter_run_cmd {
+    JNIEnv *jniEnv;
     int index;
     int arg_num;
     char **args;
 };
 
 void *thread_run_cmd(void *arg) {
-    struct Parameter_run_cmd *parameter_run_cmd = arg;
+    struct Parameter_run_cmd *parameter_run_cmd = (Parameter_run_cmd *) arg;
 
     LOGI("thread_run_cmd index %d\n", parameter_run_cmd->index);
     LOGI("thread_run_cmd arg_num %d\n", parameter_run_cmd->arg_num);
@@ -37,45 +36,70 @@ void *thread_run_cmd(void *arg) {
     LOGI("run_cmd_ffmpeg");
 
     if (ret == 0) {
-        jmethodID methodId = getMethodID(jniEnv, clazz_java, "onSuccess", "(I)V");
+        jmethodID methodId = getMethodID(parameter_run_cmd->jniEnv, clazz_java, "onSuccess",
+                                         "(I)V");
         if (methodId != NULL) {
-            (*jvm)->AttachCurrentThread(jvm, (void **) &jniEnv, NULL);
-            jniEnv->CallVoidMethod(jniEnv, clazz_java, methodId, parameter_run_cmd->index);
-            (*jvm)->DetachCurrentThread(jvm);
+            jvm->AttachCurrentThread(&parameter_run_cmd->jniEnv, NULL);
+            parameter_run_cmd->jniEnv->CallVoidMethod(clazz_java,
+                                                      methodId, parameter_run_cmd->index);
+            jvm->DetachCurrentThread();
         }
     } else {
-        jmethodID methodId = getMethodID(jniEnv, clazz_java, "onFail", "(I)V");
+        jmethodID methodId = getMethodID(parameter_run_cmd->jniEnv, clazz_java, "onFail", "(I)V");
         if (methodId != NULL) {
-            (*jvm)->AttachCurrentThread(jvm, (void **) &jniEnv, NULL);
-            (*jniEnv)->CallVoidMethod(jniEnv, clazz_java, methodId, parameter_run_cmd->index);
-            (*jvm)->DetachCurrentThread(jvm);
+            jvm->AttachCurrentThread(&parameter_run_cmd->jniEnv, NULL);
+            parameter_run_cmd->jniEnv->CallVoidMethod(clazz_java,
+                                                      methodId, parameter_run_cmd->index);
+            jvm->DetachCurrentThread();
         }
     }
     return (void *) 0;
 }
-extern "C"
+
+/**
+ * 工具方法，把java的string类型转化成 c的str
+ */
+char *Jstring2CppStr(JNIEnv *env, jstring jstr) {
+    char *rtn = NULL;
+    jclass clsstring = env->FindClass("java/lang/String");
+    jstring strencode = env->NewStringUTF("GB2312");
+    jmethodID mid = env->GetMethodID(clsstring, "getBytes",
+                                     "(Ljava/lang/String;)[B");
+    jbyteArray barr = (jbyteArray) env->CallObjectMethod(jstr, mid,
+                                                         strencode); // String .getByte("GB2312");
+    jsize alen = env->GetArrayLength(barr);
+    jbyte *ba = env->GetByteArrayElements(barr, JNI_FALSE);
+    if (alen > 0) {
+        rtn = (char *) malloc(alen + 1); //"\0"
+        memcpy(rtn, ba, alen);
+        rtn[alen] = '\0';
+    }
+    env->ReleaseByteArrayElements(barr, ba, 0); //释放内存
+    return rtn;
+}
 JNIEXPORT jlong JNICALL
 Java_com_cy_ffmpegcmd_JniUtils_runCmd(JNIEnv *env, jclass clazz, jint index,
                                       jobjectArray commands) {
 
-    jniEnv = env;
-    (*env)->GetJavaVM(env, &jvm);
+    env->GetJavaVM(&jvm);
     clazz_java = clazz;
-    int arg_num = (*env)->GetArrayLength(env, commands);
-    char **args = malloc(sizeof(char *) * arg_num);
+    int arg_num = env->GetArrayLength(commands);
+    char **args = (char **) malloc(sizeof(char *) * arg_num);
 
     LOGE("Kit argc %d\n", arg_num);
     int i;
     for (i = 0; i < arg_num; i++) {
-        jstring js = (jstring) (*env)->GetObjectArrayElement(env, commands, i);
-        args[i] = env->GetStringUTFChars(env, js, 0);
+        jstring js = (jstring) env->GetObjectArrayElement(commands, i);
+        args[i] = Jstring2CppStr(env, js);
         LOGE("Kit argv %s\n", args[i]);
     }
     LOGI("pthread_create0");
 
-    struct Parameter_run_cmd *parameter_run_cmd = malloc(sizeof(struct Parameter_run_cmd));
+    struct Parameter_run_cmd *parameter_run_cmd = (Parameter_run_cmd *) malloc(
+            sizeof(Parameter_run_cmd));
     LOGI("pthread_create1");
 
+    parameter_run_cmd->jniEnv = env;
     parameter_run_cmd->index = index;
     parameter_run_cmd->arg_num = arg_num;
     parameter_run_cmd->args = args;
@@ -92,8 +116,8 @@ Java_com_cy_ffmpegcmd_JniUtils_runCmd(JNIEnv *env, jclass clazz, jint index,
 
     if (temp != 0) {
         LOGE("can't create thread: %s ", strerror(temp));
-        jmethodID methodId = getMethodID(jniEnv, clazz_java, "onFail", "(I)V");
-        if (methodId != NULL)(*jniEnv)->CallVoidMethod(jniEnv, clazz_java, methodId, index);
+        jmethodID methodId = getMethodID(env, clazz_java, "onFail", "(I)V");
+        if (methodId != NULL)env->CallVoidMethod(clazz_java, methodId, index);
         return -1;
     }
     LOGI("create thread succes: %s ", strerror(temp));
@@ -101,27 +125,26 @@ Java_com_cy_ffmpegcmd_JniUtils_runCmd(JNIEnv *env, jclass clazz, jint index,
 
 }
 
+
 void cmd_progress(int index, int hour, int min, int secs, int totalSecs) {
     LOGI("cmd_progress");
-
+    JNIEnv *jniEnv;
+    jvm->AttachCurrentThread(&jniEnv, NULL);
     jmethodID methodId = getMethodID(jniEnv, clazz_java, "onProgress", "(IIIII)V");
     if (methodId != NULL) {
         LOGI("cmd_progress111111");
 
-        (*jvm)->AttachCurrentThread(jvm, (void **) &jniEnv, NULL);
-        LOGI("cmd_progress2222222222222222");
-
-        (*jniEnv)->CallVoidMethod(jniEnv, clazz_java, methodId, index, hour, min, secs, totalSecs);
+        jniEnv->CallVoidMethod(clazz_java, methodId, index, hour, min, secs, totalSecs);
         LOGI("cmd_progress333333333333333");
 
-        (*jvm)->DetachCurrentThread(jvm);
+        jvm->DetachCurrentThread();
         LOGI("cmd_progress4444444444444");
-
 
     }
 }
-extern "C"
+
 JNIEXPORT void JNICALL
 Java_com_cy_ffmpegcmd_JniUtils_cancelCmd(JNIEnv *env, jclass type, jlong id_thread) {
     pthread_kill(id_thread, SIGKILL);
 }
+
