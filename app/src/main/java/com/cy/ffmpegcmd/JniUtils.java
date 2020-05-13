@@ -3,7 +3,7 @@ package com.cy.ffmpegcmd;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class JniUtils {
-    private ConcurrentHashMap<Integer, CmdCallback> map_cmdCallback = new ConcurrentHashMap<>();
+    private static ConcurrentHashMap<Integer, CmdCallback> map_cmdCallback = new ConcurrentHashMap<>();
 
     static {
         System.loadLibrary("ffmpegcmd");
@@ -50,13 +50,13 @@ public class JniUtils {
 
     private static native void cancelCmd(long id_thread);
 
-    private void onProgress(int index, int hour, int min, int secs, int totalSecs) {
+    private static void onProgress(int index, int hour, int min, int secs, long totalSecs) {
         CmdCallback cmdCallback = map_cmdCallback.get(index);
         if (cmdCallback != null) cmdCallback.onProgress(hour, min, secs, totalSecs);
         LogUtils.log("onProgress", hour + ":" + min + ":" + secs + "__________" + totalSecs);
     }
 
-    private void onFail(int index) {
+    private static void onFail(int index) {
         LogUtils.log("onFail");
         CmdCallback cmdCallback = map_cmdCallback.get(index);
         if (cmdCallback != null) {

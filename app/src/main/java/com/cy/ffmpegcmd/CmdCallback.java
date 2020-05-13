@@ -11,7 +11,7 @@ public abstract class CmdCallback {
         this.id_thread = id_thread;
     }
 
-    public abstract void onProgress(int hour, int min, int secs, int totalSecs);
+    public abstract void onProgress(int hour, int min, int secs, long totalSecs);
     public abstract void onSuccess();
     public abstract void onFail();
     public abstract void onCancel();

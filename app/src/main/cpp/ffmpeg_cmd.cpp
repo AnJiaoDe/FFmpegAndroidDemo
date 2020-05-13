@@ -11,7 +11,9 @@
 #include "ffmpeg.h"
 #include "ffmpeg_cmd.h"
 #include <pthread.h>
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 static JavaVM *jvm;
 static jclass clazz_java;
 
@@ -36,11 +38,11 @@ void *thread_run_cmd(void *arg) {
     LOGI("run_cmd_ffmpeg");
 
     if (ret == 0) {
-        jmethodID methodId = getMethodID(parameter_run_cmd->jniEnv, clazz_java, "onSuccess",
+        jmethodID methodId = parameter_run_cmd->jniEnv->GetStaticMethodID(clazz_java, "onSuccess",
                                          "(I)V");
         if (methodId != NULL) {
             jvm->AttachCurrentThread(&parameter_run_cmd->jniEnv, NULL);
-            parameter_run_cmd->jniEnv->CallVoidMethod(clazz_java,
+            parameter_run_cmd->jniEnv->CallStaticVoidMethod(clazz_java,
                                                       methodId, parameter_run_cmd->index);
             jvm->DetachCurrentThread();
         }
@@ -48,7 +50,7 @@ void *thread_run_cmd(void *arg) {
         jmethodID methodId = getMethodID(parameter_run_cmd->jniEnv, clazz_java, "onFail", "(I)V");
         if (methodId != NULL) {
             jvm->AttachCurrentThread(&parameter_run_cmd->jniEnv, NULL);
-            parameter_run_cmd->jniEnv->CallVoidMethod(clazz_java,
+            parameter_run_cmd->jniEnv->CallStaticVoidMethod(clazz_java,
                                                       methodId, parameter_run_cmd->index);
             jvm->DetachCurrentThread();
         }
@@ -77,6 +79,8 @@ char *Jstring2CppStr(JNIEnv *env, jstring jstr) {
     env->ReleaseByteArrayElements(barr, ba, 0); //释放内存
     return rtn;
 }
+
+
 JNIEXPORT jlong JNICALL
 Java_com_cy_ffmpegcmd_JniUtils_runCmd(JNIEnv *env, jclass clazz, jint index,
                                       jobjectArray commands) {
@@ -116,8 +120,8 @@ Java_com_cy_ffmpegcmd_JniUtils_runCmd(JNIEnv *env, jclass clazz, jint index,
 
     if (temp != 0) {
         LOGE("can't create thread: %s ", strerror(temp));
-        jmethodID methodId = getMethodID(env, clazz_java, "onFail", "(I)V");
-        if (methodId != NULL)env->CallVoidMethod(clazz_java, methodId, index);
+        jmethodID methodId =env-> GetStaticMethodID( clazz_java, "onFail", "(I)V");
+        if (methodId != NULL)env->CallStaticVoidMethod(clazz_java, methodId, index);
         return -1;
     }
     LOGI("create thread succes: %s ", strerror(temp));
@@ -126,15 +130,18 @@ Java_com_cy_ffmpegcmd_JniUtils_runCmd(JNIEnv *env, jclass clazz, jint index,
 }
 
 
+
 void cmd_progress(int index, int hour, int min, int secs, int totalSecs) {
     LOGI("cmd_progress");
     JNIEnv *jniEnv;
     jvm->AttachCurrentThread(&jniEnv, NULL);
-    jmethodID methodId = getMethodID(jniEnv, clazz_java, "onProgress", "(IIIII)V");
+    if(jniEnv==NULL)  LOGI("cmd_progress NULL");
+
+    jmethodID methodId = jniEnv->GetStaticMethodID( clazz_java, "onProgress", "(IIIIJ)V");
     if (methodId != NULL) {
         LOGI("cmd_progress111111");
 
-        jniEnv->CallVoidMethod(clazz_java, methodId, index, hour, min, secs, totalSecs);
+        jniEnv->CallStaticVoidMethod(clazz_java, methodId, index, hour, min, secs, totalSecs);
         LOGI("cmd_progress333333333333333");
 
         jvm->DetachCurrentThread();
@@ -142,9 +149,12 @@ void cmd_progress(int index, int hour, int min, int secs, int totalSecs) {
 
     }
 }
-
 JNIEXPORT void JNICALL
 Java_com_cy_ffmpegcmd_JniUtils_cancelCmd(JNIEnv *env, jclass type, jlong id_thread) {
     pthread_kill(id_thread, SIGKILL);
 }
 
+
+#ifdef __cplusplus
+}
+#endif
